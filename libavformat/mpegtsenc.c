@@ -417,6 +417,9 @@ static int get_m2ts_stream_type(AVFormatContext *s, AVStream *st)
     case AV_CODEC_ID_HDMV_TEXT_SUBTITLE:
         stream_type = 0x92;
         break;
+    case AV_CODEC_ID_SCTE_35:
+        stream_type = 0x86;
+        break;
     default:
         av_log_once(s, AV_LOG_WARNING, AV_LOG_DEBUG, &ts_st->data_st_warning,
                     "Stream %d, codec %s, is muxed as a private data stream "

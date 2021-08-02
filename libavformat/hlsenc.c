@@ -53,6 +53,7 @@
 #include "hlsplaylist.h"
 #include "internal.h"
 #include "os_support.h"
+#include "scte_35.h"
 
 typedef enum {
     HLS_START_SEQUENCE_AS_START_NUMBER = 0,
@@ -83,6 +84,10 @@ typedef struct HLSSegment {
     int64_t keyframe_pos;
     int64_t keyframe_size;
     unsigned var_stream_idx;
+    struct scte35_event *event;
+    enum scte35_event_state event_state;
+    int adv_count;
+    int64_t start_pts;
 
     char key_uri[LINE_BUFFER_SIZE + 1];
     char iv_string[KEYSIZE*2 + 1];
@@ -258,6 +263,9 @@ typedef struct HLSContext {
     char *headers;
     int has_default_key; /* has DEFAULT field of var_stream_map */
     int has_video_m3u8; /* has video stream m3u8 list */
+
+    int adv_count;
+    struct scte35_interface *scte_iface;
 } HLSContext;
 
 static int strftime_expand(const char *fmt, char **dest)
@@ -686,6 +694,8 @@ static int hls_delete_old_segments(AVFormatContext *s, HLSContext *hls,
         av_bprint_clear(&path);
         previous_segment = segment;
         segment = previous_segment->next;
+        if (hls->scte_iface)
+            hls->scte_iface->unref_scte35_event(&previous_segment->event);
         av_freep(&previous_segment);
     }
 
@@ -1108,6 +1118,7 @@ static int sls_flag_use_localtime_filename(AVFormatContext *oc, HLSContext *c, V
 /* Create a new segment and append it to the segment list */
 static int hls_append_segment(struct AVFormatContext *s, HLSContext *hls,
                               VariantStream *vs, double duration, int64_t pos,
+                              int64_t start_pts, struct scte35_event *event,
                               int64_t size)
 {
     HLSSegment *en = av_malloc(sizeof(*en));
@@ -1149,6 +1160,16 @@ static int hls_append_segment(struct AVFormatContext *s, HLSContext *hls,
     en->next     = NULL;
     en->discont  = 0;
     en->discont_program_date_time = 0;
+    en->event      = event;
+    en->start_pts  = start_pts;
+
+    if (hls->scte_iface) {
+        if (hls->scte_iface->event_state == EVENT_OUT_CONT)
+            hls->adv_count++;
+        else
+            hls->adv_count = 0;
+        en->event_state = hls->scte_iface->event_state;
+    }
 
     if (vs->discontinuity) {
         en->discont = 1;
@@ -1295,7 +1316,7 @@ static int parse_playlist(AVFormatContext *s, const char *url, VariantStream *vs
                 is_segment = 0;
                 new_start_pos = avio_tell(vs->avf->pb);
                 vs->size = new_start_pos - vs->start_pos;
-                ret = hls_append_segment(s, hls, vs, vs->duration, vs->start_pos, vs->size);
+                ret = hls_append_segment(s, hls, vs, vs->duration, vs->start_pos, 0, NULL, vs->size);
                 vs->last_segment->discont_program_date_time = discont_program_date_time;
                 discont_program_date_time += vs->duration;
                 if (ret < 0)
@@ -1604,6 +1625,15 @@ static int hls_window(AVFormatContext *s, int last, VariantStream *vs)
         avio_printf(byterange_mode ? hls->m3u8_out : vs->out, "#EXT-X-INDEPENDENT-SEGMENTS\n");
     }
     for (en = vs->segments; en; en = en->next) {
+        if (hls->scte_iface && en->event) { //&& hls->end_pts >= en->event->out_pts
+            char *str;
+            char fname[1024] = "";
+            if (hls->baseurl)
+                strncat(fname, hls->baseurl, sizeof(fname)-1);
+            strncat(fname, en->filename, sizeof(fname)-strlen(fname)-1);
+            str = hls->scte_iface->get_hls_string(hls->scte_iface, en->event, fname, en->event_state, -1, en->start_pts);
+            avio_printf(byterange_mode ? hls->m3u8_out : vs->out, "%s", str);
+        }
         if ((hls->encrypt || hls->key_info_file) && (!key_uri || strcmp(en->key_uri, key_uri) ||
                                     av_strcasecmp(en->iv_string, iv_string))) {
             avio_printf(byterange_mode ? hls->m3u8_out : vs->out, "#EXT-X-KEY:METHOD=AES-128,URI=\"%s\"", en->key_uri);
@@ -2333,8 +2363,16 @@ static int hls_write_header(AVFormatContext *s)
                 }
             }
 
-            if (outer_st->codecpar->codec_type != AVMEDIA_TYPE_SUBTITLE)
-                inner_st = vs->avf->streams[j];
+            if (outer_st->codecpar->codec_type != AVMEDIA_TYPE_SUBTITLE) {
+                if (outer_st->codecpar->codec_type == AVMEDIA_TYPE_DATA) {
+                    inner_st = vs->avf->streams[j];
+                    hls->scte_iface = ff_alloc_scte35_parser(hls, outer_st->time_base);
+                    continue;
+                }
+                else {
+                    inner_st = vs->avf->streams[j];
+                }
+            }
             else if (vs->vtt_avf)
                 inner_st = vs->vtt_avf->streams[0];
             else {
@@ -2429,6 +2467,12 @@ static int hls_write_packet(AVFormatContext *s, AVPacket *pkt)
     int use_temp_file = 0;
     VariantStream *vs = NULL;
     char *old_filename = NULL;
+    struct scte35_event *event = NULL;
+
+    if (st->codecpar->codec_id == AV_CODEC_ID_SCTE_35) {
+        ret = ff_parse_scte35_pkt(hls->scte_iface, pkt);
+        return ret;
+    }
 
     for (i = 0; i < hls->nb_varstreams; i++) {
         vs = &hls->var_streams[i];
@@ -2500,15 +2544,24 @@ static int hls_write_packet(AVFormatContext *s, AVPacket *pkt)
         }
     }
 
+    if (hls->scte_iface)
+        hls->scte_iface->update_video_pts(hls->scte_iface, pkt->pts);
+
     can_split = can_split && (pkt->pts - vs->end_pts > 0);
-    if (vs->packets_written && can_split && av_compare_ts(pkt->pts - vs->start_pts, st->time_base,
-                                                          end_pts, AV_TIME_BASE_Q) >= 0) {
+    if (vs->packets_written && can_split && 
+        ((av_compare_ts(pkt->pts - vs->start_pts, st->time_base, end_pts, AV_TIME_BASE_Q) >= 0) ||
+         (hls->scte_iface && hls->scte_iface->event_state == EVENT_OUT))) {
         int64_t new_start_pos;
         int byterange_mode = (hls->flags & HLS_SINGLE_FILE) || (hls->max_seg_size > 0);
 
         av_write_frame(oc, NULL); /* Flush any buffered data */
         new_start_pos = avio_tell(oc->pb);
         vs->size = new_start_pos - vs->start_pos;
+        if (hls->scte_iface) {
+            event = hls->scte_iface->update_event_state(hls->scte_iface);
+            if (event)
+                hls->scte_iface->ref_scte35_event(event);
+        }
         avio_flush(oc->pb);
         if (hls->segment_type == SEGMENT_TYPE_FMP4) {
             if (!vs->init_range_length) {
@@ -2612,7 +2665,7 @@ static int hls_write_packet(AVFormatContext *s, AVPacket *pkt)
 
         if (vs->start_pos || hls->segment_type != SEGMENT_TYPE_FMP4) {
             double cur_duration =  (double)(pkt->pts - vs->end_pts) * st->time_base.num / st->time_base.den;
-            ret = hls_append_segment(s, hls, vs, cur_duration, vs->start_pos, vs->size);
+            ret = hls_append_segment(s, hls, vs, cur_duration, vs->start_pos,  pkt->pts, event, vs->size);
             vs->end_pts = pkt->pts;
             vs->duration = 0;
             if (ret < 0) {
@@ -2834,7 +2887,7 @@ failed:
         }
 
         /* after av_write_trailer, then duration + 1 duration per packet */
-        hls_append_segment(s, hls, vs, vs->duration + vs->dpp, vs->start_pos, vs->size);
+        hls_append_segment(s, hls, vs, vs->duration + vs->dpp, vs->start_pos, vs->end_pts, NULL, vs->size);
 
         sls_flag_file_rename(hls, vs, old_filename);
 
@@ -2853,6 +2906,7 @@ failed:
         ffio_free_dyn_buf(&oc->pb);
 
         av_free(old_filename);
+        ff_delete_scte35_parser(hls->scte_iface);
     }
 
     return 0;
@@ -3199,6 +3253,7 @@ AVOutputFormat ff_hls_muxer = {
     .audio_codec    = AV_CODEC_ID_AAC,
     .video_codec    = AV_CODEC_ID_H264,
     .subtitle_codec = AV_CODEC_ID_WEBVTT,
+    .data_codec     = AV_CODEC_ID_SCTE_35,
     .flags          = AVFMT_NOFILE | AVFMT_GLOBALHEADER | AVFMT_ALLOW_FLUSH | AVFMT_NODIMENSIONS,
     .init           = hls_init,
     .write_header   = hls_write_header,

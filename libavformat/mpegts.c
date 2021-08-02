@@ -960,6 +960,13 @@ static int mpegts_set_stream_info(AVStream *st, PESContext *pes,
         st->codecpar->codec_id   = AV_CODEC_ID_BIN_DATA;
         st->internal->request_probe = AVPROBE_SCORE_STREAM_RETRY / 5;
     }
+    if ((st->internal->request_probe > 0 && st->internal->request_probe < AVPROBE_SCORE_STREAM_RETRY / 5) &&
+        st->probe_packets > 0 &&
+        stream_type == 0x86) {
+        st->codecpar->codec_type = AVMEDIA_TYPE_DATA;
+        st->codecpar->codec_id   = AV_CODEC_ID_SCTE_35;
+        st->internal->request_probe = AVPROBE_SCORE_STREAM_RETRY / 5;
+    }
 
     /* queue a context update if properties changed */
     if (old_codec_type != st->codecpar->codec_type ||
