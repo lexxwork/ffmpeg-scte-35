@@ -44,16 +44,15 @@
 
 
 static char* get_hls_string(struct scte35_interface *iface, struct scte35_event *event,
-                 const char *filename, int out_state, int seg_count, int64_t pos)
+                 const char *filename, int out_state, int seg_count, int64_t pos, double elapsed)
 {
     int ret;
     av_bprint_clear(&iface->avbstr);
     if (out_state == EVENT_IN || out_state == EVENT_OUT_CONT) {
         if (event && event->duration != AV_NOPTS_VALUE) {
-            int64_t dur = ceil(((double)event->duration * iface->timebase.num) /iface->timebase.den);
-            int64_t elapsed_time = ceil(((double)(pos - event->out_pts) * iface->timebase.num) /iface->timebase.den);
-            av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT-CONT:ElapsedTime=%"PRIu64",Duration=%"PRIu64",SCTE35=%s\n",
-                elapsed_time,  dur, iface->pkt_base64);
+            double dur = (((double)event->duration * iface->timebase.num) /iface->timebase.den);
+            av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT-CONT:ElapsedTime=%0.3f,Duration=%0.3f,SCTE35=%s\n",
+                elapsed,  dur, iface->pkt_base64);
         } else {
             av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT-CONT:SCTE35=%s\n", iface->pkt_base64);
         }
@@ -66,8 +65,8 @@ static char* get_hls_string(struct scte35_interface *iface, struct scte35_event 
             av_bprintf(&iface->avbstr, "#EXT-X-DISCONTINUITY\n");
             av_bprintf(&iface->avbstr, "#EXT-OATCLS-SCTE35:%s\n", iface->pkt_base64);
             if (event->duration != AV_NOPTS_VALUE) {
-                int64_t dur = ceil(((double)event->duration * iface->timebase.num) /iface->timebase.den);
-                av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT:%"PRIu64"\n", dur);
+                double dur = (((double)event->duration * iface->timebase.num) /iface->timebase.den);
+                av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT:%0.3f\n", dur);
             } else {
                 av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT\n");
             }
