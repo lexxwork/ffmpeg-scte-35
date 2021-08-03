@@ -2,7 +2,43 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "(gdb) Launch",
+      "name": "stream",
+      "type": "cppdbg",
+      "request": "launch",
+      "preLaunchTask": "clean-out",
+      "program": "${workspaceFolder}/ffmpeg_g",
+      "args": [
+        "-i",
+        "http://hls.nkah.net/put/test.m3u8",
+        "-c",
+        "copy",
+        "-map",
+        "0",
+        "-f",
+        "hls",
+        "-hls_time",
+        "4",
+        "-hls_list_size",
+        "20",
+        "-hls_flags",
+        "delete_segments",
+        "${workspaceFolder}/../out/stream.m3u8"
+      ],
+      "stopAtEntry": false,
+      "cwd": "${fileDirname}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ]
+    },
+    {
+      "name": "file",
       "type": "cppdbg",
       "request": "launch",
       "preLaunchTask": "clean-out",
@@ -10,7 +46,7 @@
       "args": [
         "-y",
         "-i",
-        "${workspaceFolder}/../animal3.ts",
+        "${workspaceFolder}/../videos/animal3.ts",
         "-c",
         "copy",
         "-hls_list_size",
@@ -19,29 +55,11 @@
         "4",
         "${workspaceFolder}/../out/stream.m3u8"
       ],
-      // "args": [
-      //   // "-v",
-      //   // "99",
-      //   "-i",
-      //   "http://157.90.236.87/dev/stream-origin.m3u8",
-      //   "-c",
-      //   "copy",
-      //   "-map",
-      //   "0",
-      //   "-f",
-      //   "hls",
-      //   "-hls_time",
-      //   "4",
-      //   "-hls_list_size",
-      //   "0",
-      //   "${workspaceFolder}/../out/stream-origin.m3u8"
-      // ],
       "stopAtEntry": false,
       "cwd": "${fileDirname}",
       "environment": [],
       "externalConsole": false,
       "MIMode": "gdb",
-      // "miDebuggerPath": "/usr/bin/gdb",
       "setupCommands": [
         {
           "description": "Enable pretty-printing for gdb",
