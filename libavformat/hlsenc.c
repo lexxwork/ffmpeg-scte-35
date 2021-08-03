@@ -1624,14 +1624,12 @@ static int hls_window(AVFormatContext *s, int last, VariantStream *vs)
     if (vs->has_video && (hls->flags & HLS_INDEPENDENT_SEGMENTS)) {
         avio_printf(byterange_mode ? hls->m3u8_out : vs->out, "#EXT-X-INDEPENDENT-SEGMENTS\n");
     }
+    double elapsed = 0;
     for (en = vs->segments; en; en = en->next) {
-        if (hls->scte_iface && en->event) { //&& hls->end_pts >= en->event->out_pts
-            char *str;
-            char fname[1024] = "";
-            if (hls->baseurl)
-                strncat(fname, hls->baseurl, sizeof(fname)-1);
-            strncat(fname, en->filename, sizeof(fname)-strlen(fname)-1);
-            str = hls->scte_iface->get_hls_string(hls->scte_iface, en->event, fname, en->event_state, -1, en->start_pts);
+        if (hls->scte_iface && en->event && en->event_state != EVENT_IN) {
+            char *str = hls->scte_iface->get_hls_string(hls->scte_iface, en->event, NULL, en->event_state, -1, en->start_pts, elapsed);
+            if(en->event_state == EVENT_OUT_CONT || en->event_state == EVENT_OUT)
+                elapsed += en->duration;
             avio_printf(byterange_mode ? hls->m3u8_out : vs->out, "%s", str);
         }
         if ((hls->encrypt || hls->key_info_file) && (!key_uri || strcmp(en->key_uri, key_uri) ||
