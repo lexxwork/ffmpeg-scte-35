@@ -48,7 +48,16 @@ static char* get_hls_string(struct scte35_interface *iface, struct scte35_event 
 {
     int ret;
     av_bprint_clear(&iface->avbstr);
-    if (out_state == EVENT_IN || out_state == EVENT_OUT_CONT) {
+    if (out_state == EVENT_OUT) {
+        // av_bprintf(&iface->avbstr, "#EXT-X-DISCONTINUITY\n");
+        av_bprintf(&iface->avbstr, "#EXT-OATCLS-SCTE35:%s\n", iface->pkt_base64);
+        if (event->duration != AV_NOPTS_VALUE) {
+            double dur = (((double)event->duration * iface->timebase.num) /iface->timebase.den);
+            av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT:%0.3f\n", dur);
+        } else {
+            av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT\n");
+        }
+    } else if (out_state == EVENT_OUT_CONT) {
         if (event && event->duration != AV_NOPTS_VALUE) {
             double dur = (((double)event->duration * iface->timebase.num) /iface->timebase.den);
             av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT-CONT:ElapsedTime=%0.3f,Duration=%0.3f,SCTE35=%s\n",
@@ -56,21 +65,9 @@ static char* get_hls_string(struct scte35_interface *iface, struct scte35_event 
         } else {
             av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT-CONT:SCTE35=%s\n", iface->pkt_base64);
         }
-        if(out_state == EVENT_IN) {
-            av_bprintf(&iface->avbstr, "#EXT-X-CUE-IN\n");
-            av_bprintf(&iface->avbstr, "#EXT-X-DISCONTINUITY\n");
-        }
-    } else if (out_state == EVENT_OUT) {
-        if (event) {
-            av_bprintf(&iface->avbstr, "#EXT-X-DISCONTINUITY\n");
-            av_bprintf(&iface->avbstr, "#EXT-OATCLS-SCTE35:%s\n", iface->pkt_base64);
-            if (event->duration != AV_NOPTS_VALUE) {
-                double dur = (((double)event->duration * iface->timebase.num) /iface->timebase.den);
-                av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT:%0.3f\n", dur);
-            } else {
-                av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT\n");
-            }
-        }
+    } else if (out_state == EVENT_IN) {
+        av_bprintf(&iface->avbstr, "#EXT-X-CUE-IN\n");
+        // av_bprintf(&iface->avbstr, "#EXT-X-DISCONTINUITY\n");
     }
 
     ret = av_bprint_is_complete(&iface->avbstr);
