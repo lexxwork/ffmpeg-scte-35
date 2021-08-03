@@ -2366,7 +2366,7 @@ static int hls_write_header(AVFormatContext *s)
             }
 
             if (outer_st->codecpar->codec_type != AVMEDIA_TYPE_SUBTITLE) {
-                if (outer_st->codecpar->codec_type == AVMEDIA_TYPE_DATA) {
+                if (outer_st->codecpar->codec_id == AV_CODEC_ID_SCTE_35) {
                     inner_st = vs->avf->streams[j];
                     hls->scte_iface = ff_alloc_scte35_parser(hls, outer_st->time_base);
                     continue;
