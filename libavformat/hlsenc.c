@@ -1626,11 +1626,15 @@ static int hls_window(AVFormatContext *s, int last, VariantStream *vs)
     }
     double elapsed = 0;
     for (en = vs->segments; en; en = en->next) {
-        if (hls->scte_iface && en->event && en->event_state != EVENT_IN) {
-            char *str = hls->scte_iface->get_hls_string(hls->scte_iface, en->event, NULL, en->event_state, -1, en->start_pts, elapsed);
-            if(en->event_state == EVENT_OUT_CONT || en->event_state == EVENT_OUT)
-                elapsed += en->duration;
-            avio_printf(byterange_mode ? hls->m3u8_out : vs->out, "%s", str);
+        if (hls->scte_iface && en->event) {
+            if(en->event_state != EVENT_IN) {
+                char *str = hls->scte_iface->get_hls_string(hls->scte_iface, en->event, NULL, en->event_state, -1, en->start_pts, elapsed);
+                if(en->event_state == EVENT_OUT_CONT || en->event_state == EVENT_OUT)
+                    elapsed += en->duration;
+                avio_printf(byterange_mode ? hls->m3u8_out : vs->out, "%s", str);
+            }
+            else
+                elapsed = 0;
         }
         if ((hls->encrypt || hls->key_info_file) && (!key_uri || strcmp(en->key_uri, key_uri) ||
                                     av_strcasecmp(en->iv_string, iv_string))) {
