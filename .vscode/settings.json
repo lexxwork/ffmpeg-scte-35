@@ -4,6 +4,8 @@
     "condition_variable": "c",
     "mutex": "c",
     "thread": "c",
-    "numeric": "c"
+    "numeric": "c",
+    "avio_internal.h": "c",
+    "sstream": "c"
   }
 }
