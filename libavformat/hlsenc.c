@@ -2365,16 +2365,13 @@ static int hls_write_header(AVFormatContext *s)
                 }
             }
 
-            if (outer_st->codecpar->codec_type != AVMEDIA_TYPE_SUBTITLE) {
-                if (outer_st->codecpar->codec_id == AV_CODEC_ID_SCTE_35) {
-                    inner_st = vs->avf->streams[j];
-                    hls->scte_iface = ff_alloc_scte35_parser(hls, outer_st->time_base);
-                    continue;
-                }
-                else {
-                    inner_st = vs->avf->streams[j];
-                }
+            if (outer_st->codecpar->codec_id == AV_CODEC_ID_SCTE_35) {
+                inner_st = vs->avf->streams[j];
+                hls->scte_iface = ff_alloc_scte35_parser(hls, outer_st->time_base);
+                continue;
             }
+            if (outer_st->codecpar->codec_type != AVMEDIA_TYPE_SUBTITLE)
+                inner_st = vs->avf->streams[j];
             else if (vs->vtt_avf)
                 inner_st = vs->vtt_avf->streams[0];
             else {
