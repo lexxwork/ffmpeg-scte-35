@@ -9,7 +9,7 @@
       "program": "${workspaceFolder}/ffmpeg_g",
       "args": [
         "-i",
-        "http://hls.nkah.net/put/test.m3u8",
+        "http://demo.ssai.tv/animal_planet/",
         "-c",
         "copy",
         "-map",

@@ -106,7 +106,7 @@ static void unref_scte35_event(struct scte35_event **event)
     if (!(*event))
         return;
     if (!(*event)->ref_count) {
-        av_freep(event);
+        // av_freep(event);
     } else {
         (*event)->ref_count--;
     }
