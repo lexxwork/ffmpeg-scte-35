@@ -90,6 +90,9 @@ static struct scte35_event* alloc_scte35_event(int id)
     event->in_pts = AV_NOPTS_VALUE;
     event->nearest_in_pts = AV_NOPTS_VALUE;
     event->out_pts = AV_NOPTS_VALUE;
+    // event->duration = 0;
+    // event->start_pos = 0;
+    // event->ref_count = 0;
     event->running = 0;
     event->next = NULL;
     event->prev = NULL;
