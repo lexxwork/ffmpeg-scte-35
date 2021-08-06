@@ -69,7 +69,9 @@ struct scte35_interface {
     void *parent;
     /* general purpose str */
     AVBPrint avbstr;
-
+    /* manual elapased counter */
+    double elapsed;
+    
     void (*update_video_pts)(struct scte35_interface *iface, uint64_t pts);
     struct scte35_event* (*update_event_state)(struct scte35_interface *iface);
     char* (*get_hls_string)(struct scte35_interface *iface, struct scte35_event *event,

@@ -506,6 +506,8 @@ struct scte35_interface* ff_alloc_scte35_parser(void *parent, AVRational timebas
     iface->ref_scte35_event = ref_scte35_event;
     iface->event_state = EVENT_NONE;
     iface->prev_event_state = EVENT_NONE;
+    iface->elapsed = 0;
+
     return iface;
 }
 
