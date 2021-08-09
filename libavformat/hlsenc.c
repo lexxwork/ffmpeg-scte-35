@@ -1647,18 +1647,12 @@ static int hls_window(AVFormatContext *s, int last, VariantStream *vs)
                                       en->filename,
                                       en->discont_program_date_time ? &en->discont_program_date_time : prog_date_time_p,
                                       en->keyframe_size, en->keyframe_pos, hls->flags & HLS_I_FRAMES_ONLY);
-
+        
         if (hls->scte_iface && en->event) {
-            if(en->event_state == EVENT_OUT_CONT)
-                hls->scte_iface->elapsed += en->duration;
-            else if(en->event_state == EVENT_NONE)
-                hls->scte_iface->elapsed = 0;
-            char *str = hls->scte_iface->get_hls_string(hls->scte_iface, en->event, NULL, en->event_state, -1, en->start_pts,
-                                                        hls->scte_iface->elapsed);
+            char *str = hls->scte_iface->get_hls_string(hls->scte_iface, en->event, NULL, en->event_state, -1, en->start_pts);
             avio_printf(byterange_mode ? hls->m3u8_out : vs->out, "%s", str);
-        } else {
-            hls->scte_iface->elapsed = 0;
         }
+        
         if (en->discont_program_date_time)
             en->discont_program_date_time -= en->duration;
         if (ret < 0) {
