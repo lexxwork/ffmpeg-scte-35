@@ -59,9 +59,10 @@ static char* get_hls_string(struct scte35_interface *iface, struct scte35_event 
         }
     } else if (out_state == EVENT_OUT_CONT) {
         if (event && event->duration != AV_NOPTS_VALUE) {
-            double dur = (((double)event->duration * iface->timebase.num) /iface->timebase.den);
+            double duration = ((double)event->duration * iface->timebase.num) / iface->timebase.den;
+            double elapsed_time = (double)(pos - event->out_pts) * iface->timebase.num / iface->timebase.den;
             av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT-CONT:ElapsedTime=%0.3f,Duration=%0.3f,SCTE35=%s\n",
-                elapsed,  dur, iface->pkt_base64);
+                elapsed_time,  duration, iface->pkt_base64);
         } else {
             av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT-CONT:SCTE35=%s\n", iface->pkt_base64);
         }
@@ -161,7 +162,7 @@ static int parse_splice_time(struct scte35_interface *iface, const uint8_t *buf,
     ret =  get_bits(&gb, 1);
     if (ret) {
         skip_bits(&gb, 6);
-        *pts = get_bits64(&gb,33); // + pts_adjust
+        *pts = get_bits64(&gb,33) + pts_adjust;
         return 5;
     } else {
         skip_bits(&gb, 7);
@@ -233,18 +234,16 @@ static int parse_insert_cmd(struct scte35_interface *iface,
     if (program_splice_flag &&  !splice_immediate_flag) {
         if (inout) {
             ret = parse_splice_time(iface, buf, &event->out_pts, pts_adjust);
-            event->out_pts = event->out_pts * iface->timebase.num / iface->timebase.den;
         } else {
             ret = parse_splice_time(iface, buf, &event->in_pts, pts_adjust);
-            event->in_pts = event->in_pts * iface->timebase.num / iface->timebase.den;
         }
 
         buf += ret;
     } else if (program_splice_flag && splice_immediate_flag) {
         if (inout)
-            event->out_pts = current_pts * iface->timebase.num / iface->timebase.den;
+            event->out_pts = current_pts;
         else
-            event->in_pts = current_pts * iface->timebase.num / iface->timebase.den;
+            event->in_pts = current_pts;
     }
     if (program_splice_flag == 0) {
         int comp_cnt = *buf++;
@@ -267,7 +266,7 @@ static int parse_insert_cmd(struct scte35_interface *iface,
         auto_return =  get_bits(&gb, 1);
         av_log(iface->parent, AV_LOG_DEBUG, "autoreturn  = %d\n", auto_return);
         skip_bits(&gb, 6);
-        event->duration = get_bits64(&gb,33); // + pts_adjust
+        event->duration = get_bits64(&gb,33) + pts_adjust;
         buf += 5;
     }
     u_program_id = AV_RB16(buf);
