@@ -36,6 +36,7 @@ struct scte35_event {
     int64_t start_pos;
     int running;
     int ref_count;
+    char *pkt_base64;
     /* to traverse the list of events */
     struct scte35_event *next;
     struct scte35_event *prev;
@@ -63,8 +64,6 @@ struct scte35_interface {
     /* saved previous state to correctly transition
         the event state */
     int prev_event_state;
-    //TODO use AV_BASE64_SIZE to dynamically allocate the array
-    char pkt_base64[1024];
     /* keep context of its parent for log */
     void *parent;
     /* general purpose str */

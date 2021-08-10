@@ -50,7 +50,7 @@ static char* get_hls_string(struct scte35_interface *iface, struct scte35_event 
     av_bprint_clear(&iface->avbstr);
     if (out_state == EVENT_OUT) {
         // av_bprintf(&iface->avbstr, "#EXT-X-DISCONTINUITY\n");
-        av_bprintf(&iface->avbstr, "#EXT-OATCLS-SCTE35:%s\n", iface->pkt_base64);
+        av_bprintf(&iface->avbstr, "#EXT-OATCLS-SCTE35:%s\n", event->pkt_base64);
         if (event->duration != AV_NOPTS_VALUE) {
             double dur = (((double)event->duration * iface->timebase.num) /iface->timebase.den);
             av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT:%0.3f\n", dur);
@@ -62,9 +62,9 @@ static char* get_hls_string(struct scte35_interface *iface, struct scte35_event 
             double duration = ((double)event->duration * iface->timebase.num) / iface->timebase.den;
             double elapsed_time = (double)(pos - event->out_pts) * iface->timebase.num / iface->timebase.den;
             av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT-CONT:ElapsedTime=%0.3f,Duration=%0.3f,SCTE35=%s\n",
-                elapsed_time,  duration, iface->pkt_base64);
+                elapsed_time,  duration, event->pkt_base64);
         } else {
-            av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT-CONT:SCTE35=%s\n", iface->pkt_base64);
+            av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT-CONT:SCTE35=%s\n", event->pkt_base64);
         }
     } else if (out_state == EVENT_IN) {
         av_bprintf(&iface->avbstr, "#EXT-X-CUE-IN\n");
@@ -107,6 +107,7 @@ static void unref_scte35_event(struct scte35_event **event)
     if (!(*event))
         return;
     if (!(*event)->ref_count) {
+        av_freep(&(*event)->pkt_base64);
         // av_freep(event);
     } else {
         (*event)->ref_count--;
@@ -180,7 +181,7 @@ static int parse_schedule_cmd(struct scte35_interface *iface, const uint8_t *buf
      @return length of buffer used
  */
 static int parse_insert_cmd(struct scte35_interface *iface,
-    const uint8_t *buf,const int len, int64_t pts_adjust, int64_t current_pts)
+    const uint8_t *buf,const int len, int64_t pts_adjust, int64_t current_pts, char *pkt_base64)
 {
     GetBitContext gb;
     int ret;
@@ -277,6 +278,8 @@ static int parse_insert_cmd(struct scte35_interface *iface,
     avail_expect = *buf++;
     av_log(iface->parent, AV_LOG_DEBUG, "avail_expect  = %hhd\n", avail_expect);
 
+    event->pkt_base64 = pkt_base64;
+
     return buf - sbuf;
 }
 static int parse_time_signal_cmd(struct scte35_interface *iface, const uint8_t *buf)
@@ -302,6 +305,8 @@ int ff_parse_scte35_pkt(struct scte35_interface *iface, const AVPacket *avpkt)
     GetBitContext gb;
     int ret;
     int64_t pts_adjust;
+    size_t b64_size;
+    char *pkt_base64;
 
     if (!buf)
         return AVERROR_EOF;
@@ -334,7 +339,10 @@ int ff_parse_scte35_pkt(struct scte35_interface *iface, const AVPacket *avpkt)
         return AVERROR_INVALIDDATA;
     }
 
-    av_base64_encode(iface->pkt_base64, AV_BASE64_SIZE(section_length + 3), buf, section_length + 3);
+    b64_size = AV_BASE64_SIZE(section_length + 3);
+    pkt_base64 = av_malloc(b64_size);
+    av_base64_encode(pkt_base64, b64_size, buf, section_length + 3);
+    av_log(iface->parent, AV_LOG_DEBUG, "pkt_base64  = %s\n", pkt_base64);
 
     /* protocol version */
     skip_bits(&gb,8);
@@ -376,7 +384,7 @@ int ff_parse_scte35_pkt(struct scte35_interface *iface, const AVPacket *avpkt)
         ret = parse_schedule_cmd(iface, buf + 14);
         break;
     case SCTE_CMD_INSERT:
-        ret = parse_insert_cmd(iface, buf + 14, cmd_length, pts_adjust, avpkt->pts);
+        ret = parse_insert_cmd(iface, buf + 14, cmd_length, pts_adjust, avpkt->pts, pkt_base64);
         break;
     case SCTE_CMD_SIGNAL:
         ret = parse_time_signal_cmd(iface, buf + 14);
