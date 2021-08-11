@@ -1652,7 +1652,7 @@ static int hls_window(AVFormatContext *s, int last, VariantStream *vs)
             char *str = hls->scte_iface->get_hls_string(hls->scte_iface, en->event, NULL, en->event_state, -1, en->start_pts);
             avio_printf(byterange_mode ? hls->m3u8_out : vs->out, "%s", str);
         }
-        
+
         if (en->discont_program_date_time)
             en->discont_program_date_time -= en->duration;
         if (ret < 0) {
@@ -2544,7 +2544,8 @@ static int hls_write_packet(AVFormatContext *s, AVPacket *pkt)
         hls->scte_iface->update_video_pts(hls->scte_iface, pkt->pts);
 
     can_split = can_split && (pkt->pts - vs->end_pts > 0);
-    can_split_scte35 = hls->scte_iface && hls->scte_iface->event_state == EVENT_OUT;
+    can_split_scte35  = hls->scte_iface &&
+        (hls->scte_iface->event_state == EVENT_OUT || hls->scte_iface->event_state == EVENT_IN);
 
     if (vs->packets_written && can_split && 
         ((av_compare_ts(pkt->pts - vs->start_pts, st->time_base, end_pts, AV_TIME_BASE_Q) >= 0) ||
