@@ -163,7 +163,7 @@ static int parse_splice_time(struct scte35_interface *iface, const uint8_t *buf,
     ret =  get_bits(&gb, 1);
     if (ret) {
         skip_bits(&gb, 6);
-        *pts = get_bits64(&gb,33); // + pts_adjust;
+        *pts = get_bits64(&gb,33) + (int)pts_adjust;
         return 5;
     } else {
         skip_bits(&gb, 7);
@@ -267,7 +267,7 @@ static int parse_insert_cmd(struct scte35_interface *iface,
         auto_return =  get_bits(&gb, 1);
         av_log(iface->parent, AV_LOG_DEBUG, "autoreturn  = %d\n", auto_return);
         skip_bits(&gb, 6);
-        event->duration = get_bits64(&gb,33); // + pts_adjust;
+        event->duration = get_bits64(&gb,33) + (int)pts_adjust;
         buf += 5;
     }
     u_program_id = AV_RB16(buf);
