@@ -43,8 +43,7 @@
 #define SCTE_CMD_BANDWIDTH_RESERVATION 0x07
 
 
-static char* get_hls_string(struct scte35_interface *iface, struct scte35_event *event,
-                 const char *filename, int out_state, int seg_count, int64_t pos)
+static char* get_hls_string(struct scte35_interface *iface, struct scte35_event *event, int out_state, int64_t pos)
 {
     int ret;
     av_bprint_clear(&iface->avbstr);
