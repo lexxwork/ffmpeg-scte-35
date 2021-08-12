@@ -60,7 +60,7 @@ static char* get_hls_string(struct scte35_interface *iface, struct scte35_event 
         if (event && event->duration != AV_NOPTS_VALUE) {
             double duration = ((double)event->duration * iface->timebase.num) / iface->timebase.den;
             double elapsed_time = (double)(pos - event->out_pts) * iface->timebase.num / iface->timebase.den;
-            av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT-CONT:ElapsedTime=%.3g,Duration=%.3g,SCTE35=%s\n",
+            av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT-CONT:ElapsedTime=%.3f,Duration=%.3g,SCTE35=%s\n",
                 elapsed_time,  duration, event->pkt_base64);
         } else {
             av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT-CONT:SCTE35=%s\n", event->pkt_base64);
@@ -163,7 +163,7 @@ static int parse_splice_time(struct scte35_interface *iface, const uint8_t *buf,
     ret =  get_bits(&gb, 1);
     if (ret) {
         skip_bits(&gb, 6);
-        *pts = get_bits64(&gb,33) + (int)pts_adjust - 3600; //some small adjust
+        *pts = get_bits64(&gb,33) + (int)pts_adjust;
         return 5;
     } else {
         skip_bits(&gb, 7);
