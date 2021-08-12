@@ -434,7 +434,7 @@ static struct scte35_event* get_event_floor_in(struct scte35_interface *iface, u
     struct scte35_event *event = iface->event_list;
     struct scte35_event *sevent = NULL;
     while(event) {
-        if (event->in_pts != AV_NOPTS_VALUE && event->in_pts < pts &&
+        if (event->in_pts != AV_NOPTS_VALUE && event->in_pts <= pts &&
           (event->nearest_in_pts == AV_NOPTS_VALUE || pts <= event->nearest_in_pts) ) {
             event->nearest_in_pts = pts;
             unlink_scte35_event(iface, event);
