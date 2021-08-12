@@ -1574,6 +1574,7 @@ static int hls_window(AVFormatContext *s, int last, VariantStream *vs)
     static unsigned warned_non_file;
     char *key_uri = NULL;
     char *iv_string = NULL;
+    char *scte_string = NULL;
     AVDictionary *options = NULL;
     double prog_date_time = vs->initial_prog_date_time;
     double *prog_date_time_p = (hls->flags & HLS_PROGRAM_DATE_TIME) ? &prog_date_time : NULL;
@@ -1626,6 +1627,14 @@ static int hls_window(AVFormatContext *s, int last, VariantStream *vs)
     }
 
     for (en = vs->segments; en; en = en->next) {
+        if (scte_string) {
+            avio_printf(byterange_mode ? hls->m3u8_out : vs->out, "%s", scte_string);
+        }
+        if (hls->scte_iface && en->event) {
+            scte_string = hls->scte_iface->get_hls_string(hls->scte_iface, en->event, en->event_state, en->start_pts);
+        } else {
+            scte_string = NULL;
+        }
         if ((hls->encrypt || hls->key_info_file) && (!key_uri || strcmp(en->key_uri, key_uri) ||
                                     av_strcasecmp(en->iv_string, iv_string))) {
             avio_printf(byterange_mode ? hls->m3u8_out : vs->out, "#EXT-X-KEY:METHOD=AES-128,URI=\"%s\"", en->key_uri);
@@ -1647,11 +1656,6 @@ static int hls_window(AVFormatContext *s, int last, VariantStream *vs)
                                       en->filename,
                                       en->discont_program_date_time ? &en->discont_program_date_time : prog_date_time_p,
                                       en->keyframe_size, en->keyframe_pos, hls->flags & HLS_I_FRAMES_ONLY);
-        
-        if (hls->scte_iface && en->event) {
-            char *str = hls->scte_iface->get_hls_string(hls->scte_iface, en->event, en->event_state, en->start_pts);
-            avio_printf(byterange_mode ? hls->m3u8_out : vs->out, "%s", str);
-        }
 
         if (en->discont_program_date_time)
             en->discont_program_date_time -= en->duration;
