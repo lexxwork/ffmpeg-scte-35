@@ -163,7 +163,7 @@ static int parse_splice_time(struct scte35_interface *iface, const uint8_t *buf,
     ret =  get_bits(&gb, 1);
     if (ret) {
         skip_bits(&gb, 6);
-        *pts = get_bits64(&gb,33) + (int)pts_adjust;
+        *pts = get_bits64(&gb,33) + (int)pts_adjust - 3600; //some small adjust
         return 5;
     } else {
         skip_bits(&gb, 7);
