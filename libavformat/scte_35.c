@@ -108,6 +108,7 @@ static void unref_scte35_event(struct scte35_event **event)
         return;
     if (!(*event)->ref_count) {
         av_freep(&(*event)->pkt_base64);
+        //TOD fix segfault
         // av_freep(event);
     } else {
         (*event)->ref_count--;
