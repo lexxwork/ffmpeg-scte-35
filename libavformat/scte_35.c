@@ -267,7 +267,7 @@ static int parse_insert_cmd(struct scte35_interface *iface,
         auto_return =  get_bits(&gb, 1);
         av_log(iface->parent, AV_LOG_DEBUG, "autoreturn  = %d\n", auto_return);
         skip_bits(&gb, 6);
-        event->duration = get_bits64(&gb,33) + (int)pts_adjust;
+        event->duration = get_bits64(&gb,33);
         buf += 5;
     }
     u_program_id = AV_RB16(buf);
