@@ -53,7 +53,7 @@ static char* get_hls_string(struct scte35_interface *iface, struct scte35_event 
         av_bprintf(&iface->avbstr, "#EXT-OATCLS-SCTE35:%s\n", event->pkt_base64);
         if (event->duration != AV_NOPTS_VALUE) {
             double dur = (((double)event->duration * iface->timebase.num) /iface->timebase.den);
-            av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT:%0.3f\n", dur);
+            av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT:%.3g\n", dur);
         } else {
             av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT\n");
         }
@@ -61,7 +61,7 @@ static char* get_hls_string(struct scte35_interface *iface, struct scte35_event 
         if (event && event->duration != AV_NOPTS_VALUE) {
             double duration = ((double)event->duration * iface->timebase.num) / iface->timebase.den;
             double elapsed_time = (double)(pos - event->out_pts) * iface->timebase.num / iface->timebase.den;
-            av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT-CONT:ElapsedTime=%0.3f,Duration=%0.3f,SCTE35=%s\n",
+            av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT-CONT:ElapsedTime=%.3g,Duration=%.3g,SCTE35=%s\n",
                 elapsed_time,  duration, event->pkt_base64);
         } else {
             av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT-CONT:SCTE35=%s\n", event->pkt_base64);
