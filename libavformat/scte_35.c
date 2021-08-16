@@ -129,6 +129,28 @@ static void unlink_scte35_event(struct scte35_interface *iface, struct scte35_ev
     unref_scte35_event(&event);
 }
 
+static void unref_scte35_block(struct scte35_interface *iface, struct scte35_event *event)
+{
+    if (!event || event->in_pts == AV_NOPTS_VALUE)
+        return;
+    if(event->ref_count > 1) {
+        event->ref_count--;
+        return;
+    }
+    if(event->next) {
+        event->next->prev = NULL;
+        iface->event_list = iface->event_list == event ? NULL : event->next;
+    } else
+        iface->event_list = NULL;
+
+    while(event) {
+        struct scte35_event *prev = event->prev;
+        av_freep(&event->pkt_base64);
+        av_freep(&event);
+        event = prev;
+    }
+}
+
 static struct scte35_event* get_event_id(struct scte35_interface *iface, int id)
 {
     struct scte35_event *event = iface->event_list;
@@ -442,7 +464,6 @@ static struct scte35_event* get_event_floor_in(struct scte35_interface *iface, u
             event->nearest_in_pts = pts;
             /* send in_event only when that event was in running state */
             if (iface->current_event->running) {
-                iface->ref_scte35_event(iface->current_event);
                 iface->event_state = EVENT_IN;
                 sevent = event;
             }
@@ -520,8 +541,9 @@ struct scte35_interface* ff_alloc_scte35_parser(void *parent, AVRational timebas
     iface->update_event_state = update_event_state;
     av_bprint_init(&iface->avbstr, 0, AV_BPRINT_SIZE_UNLIMITED);
     iface->get_hls_string = get_hls_string;
-    iface->unref_scte35_event = unref_scte35_event;
+    // iface->unref_scte35_event = unref_scte35_event;
     iface->ref_scte35_event = ref_scte35_event;
+    iface->unref_scte35_block = unref_scte35_block;
     iface->event_state = EVENT_NONE;
     iface->prev_event_state = EVENT_NONE;
 

@@ -695,7 +695,7 @@ static int hls_delete_old_segments(AVFormatContext *s, HLSContext *hls,
         previous_segment = segment;
         segment = previous_segment->next;
         if (hls->scte_iface)
-            hls->scte_iface->unref_scte35_event(&previous_segment->event);
+            hls->scte_iface->unref_scte35_block(hls->scte_iface, previous_segment->event);
         av_freep(&previous_segment);
     }
 
@@ -1626,7 +1626,7 @@ static int hls_window(AVFormatContext *s, int last, VariantStream *vs)
 
     for (en = vs->segments; en; en = en->next) {
         if (hls->scte_iface && en->event && 
-            (en->event_state == EVENT_POSTOUT || en->event_state == EVENT_OUT_CONT || en->event_state == EVENT_IN)) {
+            (en->event_state != EVENT_NONE && en->event_state != EVENT_OUT)) {
             char *str = hls->scte_iface->get_hls_string(hls->scte_iface, en->event, en->event_state, en->start_pts);
             avio_printf(byterange_mode ? hls->m3u8_out : vs->out, "%s", str);
         }
@@ -1653,11 +1653,6 @@ static int hls_window(AVFormatContext *s, int last, VariantStream *vs)
                                       en->discont_program_date_time ? &en->discont_program_date_time : prog_date_time_p,
                                       en->keyframe_size, en->keyframe_pos, hls->flags & HLS_I_FRAMES_ONLY);
         
-        if (hls->scte_iface && en->event && en->event_state == EVENT_IN) {
-            char *str = hls->scte_iface->get_hls_string(hls->scte_iface, en->event, EVENT_POSTIN, en->start_pts);
-            avio_printf(byterange_mode ? hls->m3u8_out : vs->out, "%s", str);
-        }
-
         if (en->discont_program_date_time)
             en->discont_program_date_time -= en->duration;
         if (ret < 0) {

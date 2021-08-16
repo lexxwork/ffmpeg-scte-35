@@ -61,12 +61,12 @@ struct scte35_interface {
     struct scte35_event *event_list;
     /* state of current event */
     enum scte35_event_state event_state;
+    /* saved previous state to correctly transition
+        the event state */
+    enum scte35_event_state prev_event_state;
     /* time base of pts used in parser */
     AVRational timebase;
     struct scte35_event *current_event;
-    /* saved previous state to correctly transition
-        the event state */
-    int prev_event_state;
     /* keep context of its parent for log */
     void *parent;
     /* general purpose str */
@@ -77,6 +77,7 @@ struct scte35_interface {
     char* (*get_hls_string)(struct scte35_interface *iface, struct scte35_event *event, int out_state, int64_t pos);
 
     void (*unref_scte35_event)(struct scte35_event **event);
+    void (*unref_scte35_block)(struct scte35_interface *iface, struct scte35_event *event);
     void (*ref_scte35_event)(struct scte35_event *event);
 };
 
