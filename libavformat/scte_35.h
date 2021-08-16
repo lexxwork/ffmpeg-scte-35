@@ -32,8 +32,7 @@ struct scte35_event {
     /* pts specify ehen events end */
     uint64_t out_pts;
     /* duration of the event */
-    int64_t duration;
-    int64_t start_pos;
+    uint64_t duration;
     int running;
     int ref_count;
     char *pkt_base64;
@@ -43,12 +42,16 @@ struct scte35_event {
 };
 
 enum scte35_event_state {
-    /* NO event */
+    /* nO event */
     EVENT_NONE,
-    /* Commercials need to end */
+    /* commercials need to end */
     EVENT_IN,
-    /* Commercials can start from here */
+    /* after end */
+    EVENT_POSTIN,
+    /* commercials can start from here */
     EVENT_OUT,
+    /* after start */
+    EVENT_POSTOUT,
     /* commercial can continue */
     EVENT_OUT_CONT,
 };

@@ -47,16 +47,16 @@ static char* get_hls_string(struct scte35_interface *iface, struct scte35_event 
 {
     int ret;
     av_bprint_clear(&iface->avbstr);
-    if (out_state == EVENT_OUT) {
-        // av_bprintf(&iface->avbstr, "#EXT-X-DISCONTINUITY\n");
+    if (out_state == EVENT_POSTOUT) {
         av_bprintf(&iface->avbstr, "#EXT-OATCLS-SCTE35:%s\n", event->pkt_base64);
         if (event->duration != AV_NOPTS_VALUE) {
-            double dur = (((double)event->duration * iface->timebase.num) /iface->timebase.den);
-            av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT:%.3g\n", dur);
-        } else {
+            double duration = ((double)event->duration * iface->timebase.num) / iface->timebase.den;
+            av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT:%.3g\n", duration);
+        } else
             av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT\n");
-        }
-    } else if (out_state == EVENT_OUT_CONT) {
+    } else if (out_state == EVENT_OUT_CONT || out_state == EVENT_IN) {
+        if(out_state == EVENT_IN)
+            event = event->prev;
         if (event && event->duration != AV_NOPTS_VALUE) {
             double duration = ((double)event->duration * iface->timebase.num) / iface->timebase.den;
             double elapsed_time = (double)(pos - event->out_pts) * iface->timebase.num / iface->timebase.den;
@@ -65,9 +65,8 @@ static char* get_hls_string(struct scte35_interface *iface, struct scte35_event 
         } else {
             av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT-CONT:SCTE35=%s\n", event->pkt_base64);
         }
-    } else if (out_state == EVENT_IN) {
+    } else if (out_state == EVENT_POSTIN) {
         av_bprintf(&iface->avbstr, "#EXT-X-CUE-IN\n");
-        // av_bprintf(&iface->avbstr, "#EXT-X-DISCONTINUITY\n");
     }
 
     ret = av_bprint_is_complete(&iface->avbstr);
@@ -91,6 +90,8 @@ static struct scte35_event* alloc_scte35_event(int id)
     event->nearest_in_pts = AV_NOPTS_VALUE;
     event->out_pts = AV_NOPTS_VALUE;
     event->running = 0;
+    event->ref_count = 0;
+    event->duration = AV_NOPTS_VALUE;
     event->next = NULL;
     event->prev = NULL;
     return event;
@@ -118,12 +119,13 @@ static void unlink_scte35_event(struct scte35_interface *iface, struct scte35_ev
 {
     if (!event)
         return;
-    if (!event->prev)
-        iface->event_list = event->next;
-    else
+    if (event->prev) {
         event->prev->next = event->next;
-    if (event->next)
-        event->next->prev = event->prev;
+        if (event->next)
+            event->next->prev = event->prev;
+    }
+    else
+        iface->event_list = event->next;
     unref_scte35_event(&event);
 }
 
@@ -133,7 +135,6 @@ static struct scte35_event* get_event_id(struct scte35_interface *iface, int id)
     struct scte35_event *pevent = NULL;
 
     while(event) {
-
         if (event->id == id)
             break;
         pevent = event;
@@ -141,8 +142,10 @@ static struct scte35_event* get_event_id(struct scte35_interface *iface, int id)
     }
     if (!event) {
         event = alloc_scte35_event(id);
-        if (pevent)
+        if (pevent) {
             pevent->next = event;
+            event->prev = pevent;
+        }
         else
             iface->event_list = event;
     }
@@ -220,9 +223,9 @@ static int parse_insert_cmd(struct scte35_interface *iface,
 
     } else {
         /*   Delete event only if its not already started */
-        if (!event->running) {
-            unlink_scte35_event(iface, event);
-        }
+        // if (!event->running) {
+        //     unlink_scte35_event(iface, event);
+        // }
     }
     buf++;
 
@@ -437,9 +440,9 @@ static struct scte35_event* get_event_floor_in(struct scte35_interface *iface, u
         if (event->in_pts != AV_NOPTS_VALUE && event->in_pts <= pts &&
           (event->nearest_in_pts == AV_NOPTS_VALUE || pts <= event->nearest_in_pts) ) {
             event->nearest_in_pts = pts;
-            unlink_scte35_event(iface, event);
             /* send in_event only when that event was in running state */
-            if (iface->current_event->running) { // event->running
+            if (iface->current_event->running) {
+                iface->ref_scte35_event(iface->current_event);
                 iface->event_state = EVENT_IN;
                 sevent = event;
             }
@@ -477,17 +480,25 @@ static void update_video_pts(struct scte35_interface *iface, uint64_t pts)
  */
 static struct scte35_event* update_event_state(struct scte35_interface *iface)
 {
-
     struct scte35_event* event = iface->current_event;
-    if (iface->prev_event_state == EVENT_IN)
-        iface->event_state = EVENT_NONE;
-    else if (iface->prev_event_state == EVENT_OUT)
+    
+    if(iface->prev_event_state == EVENT_OUT)
+        iface->event_state = EVENT_POSTOUT;
+    else if(iface->prev_event_state == EVENT_POSTOUT)
         iface->event_state = EVENT_OUT_CONT;
-
+    else if(iface->prev_event_state == EVENT_IN)
+        iface->event_state = EVENT_POSTIN;
+    else if(iface->prev_event_state == EVENT_POSTIN) {
+        iface->event_state = EVENT_NONE;
+        // unlink_scte35_event(iface, event);
+    }
     if (iface->event_state == EVENT_NONE)
         iface->current_event = NULL;
-
+    
     iface->prev_event_state = iface->event_state;
+    
+    if (event)
+       iface->ref_scte35_event(event);
     return event;
 }
 

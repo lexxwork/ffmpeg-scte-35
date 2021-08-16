@@ -1118,8 +1118,7 @@ static int sls_flag_use_localtime_filename(AVFormatContext *oc, HLSContext *c, V
 /* Create a new segment and append it to the segment list */
 static int hls_append_segment(struct AVFormatContext *s, HLSContext *hls,
                               VariantStream *vs, double duration, int64_t pos,
-                              int64_t start_pts, struct scte35_event *event,
-                              int64_t size)
+                              int64_t size, struct scte35_event *event)
 {
     HLSSegment *en = av_malloc(sizeof(*en));
     const char  *filename;
@@ -1161,7 +1160,7 @@ static int hls_append_segment(struct AVFormatContext *s, HLSContext *hls,
     en->discont  = 0;
     en->discont_program_date_time = 0;
     en->event      = event;
-    en->start_pts  = start_pts;
+    en->start_pts  = vs->end_pts;
 
     if (hls->scte_iface) {
         if (hls->scte_iface->event_state == EVENT_OUT_CONT)
@@ -1316,7 +1315,7 @@ static int parse_playlist(AVFormatContext *s, const char *url, VariantStream *vs
                 is_segment = 0;
                 new_start_pos = avio_tell(vs->avf->pb);
                 vs->size = new_start_pos - vs->start_pos;
-                ret = hls_append_segment(s, hls, vs, vs->duration, vs->start_pos, 0, NULL, vs->size);
+                ret = hls_append_segment(s, hls, vs, vs->duration, vs->start_pos, vs->size, NULL);
                 vs->last_segment->discont_program_date_time = discont_program_date_time;
                 discont_program_date_time += vs->duration;
                 if (ret < 0)
@@ -1574,7 +1573,6 @@ static int hls_window(AVFormatContext *s, int last, VariantStream *vs)
     static unsigned warned_non_file;
     char *key_uri = NULL;
     char *iv_string = NULL;
-    char *scte_string = NULL;
     AVDictionary *options = NULL;
     double prog_date_time = vs->initial_prog_date_time;
     double *prog_date_time_p = (hls->flags & HLS_PROGRAM_DATE_TIME) ? &prog_date_time : NULL;
@@ -1627,14 +1625,12 @@ static int hls_window(AVFormatContext *s, int last, VariantStream *vs)
     }
 
     for (en = vs->segments; en; en = en->next) {
-        if (scte_string) {
-            avio_printf(byterange_mode ? hls->m3u8_out : vs->out, "%s", scte_string);
+        if (hls->scte_iface && en->event && 
+            (en->event_state == EVENT_POSTOUT || en->event_state == EVENT_OUT_CONT || en->event_state == EVENT_IN)) {
+            char *str = hls->scte_iface->get_hls_string(hls->scte_iface, en->event, en->event_state, en->start_pts);
+            avio_printf(byterange_mode ? hls->m3u8_out : vs->out, "%s", str);
         }
-        if (hls->scte_iface && en->event) {
-            scte_string = hls->scte_iface->get_hls_string(hls->scte_iface, en->event, en->event_state, en->start_pts);
-        } else {
-            scte_string = NULL;
-        }
+
         if ((hls->encrypt || hls->key_info_file) && (!key_uri || strcmp(en->key_uri, key_uri) ||
                                     av_strcasecmp(en->iv_string, iv_string))) {
             avio_printf(byterange_mode ? hls->m3u8_out : vs->out, "#EXT-X-KEY:METHOD=AES-128,URI=\"%s\"", en->key_uri);
@@ -1656,6 +1652,11 @@ static int hls_window(AVFormatContext *s, int last, VariantStream *vs)
                                       en->filename,
                                       en->discont_program_date_time ? &en->discont_program_date_time : prog_date_time_p,
                                       en->keyframe_size, en->keyframe_pos, hls->flags & HLS_I_FRAMES_ONLY);
+        
+        if (hls->scte_iface && en->event && en->event_state == EVENT_IN) {
+            char *str = hls->scte_iface->get_hls_string(hls->scte_iface, en->event, EVENT_POSTIN, en->start_pts);
+            avio_printf(byterange_mode ? hls->m3u8_out : vs->out, "%s", str);
+        }
 
         if (en->discont_program_date_time)
             en->discont_program_date_time -= en->duration;
@@ -2549,7 +2550,8 @@ static int hls_write_packet(AVFormatContext *s, AVPacket *pkt)
 
     can_split = can_split && (pkt->pts - vs->end_pts > 0);
     can_split_scte35  = hls->scte_iface &&
-        (hls->scte_iface->event_state == EVENT_OUT || hls->scte_iface->event_state == EVENT_IN);
+        hls->scte_iface->event_state != EVENT_NONE && 
+        hls->scte_iface->event_state != EVENT_OUT_CONT;
 
     if (vs->packets_written && can_split && 
         ((av_compare_ts(pkt->pts - vs->start_pts, st->time_base, end_pts, AV_TIME_BASE_Q) >= 0) ||
@@ -2562,8 +2564,6 @@ static int hls_write_packet(AVFormatContext *s, AVPacket *pkt)
         vs->size = new_start_pos - vs->start_pos;
         if (hls->scte_iface) {
             event = hls->scte_iface->update_event_state(hls->scte_iface);
-            if (event)
-                hls->scte_iface->ref_scte35_event(event);
         }
         avio_flush(oc->pb);
         if (hls->segment_type == SEGMENT_TYPE_FMP4) {
@@ -2668,7 +2668,7 @@ static int hls_write_packet(AVFormatContext *s, AVPacket *pkt)
 
         if (vs->start_pos || hls->segment_type != SEGMENT_TYPE_FMP4) {
             double cur_duration =  (double)(pkt->pts - vs->end_pts) * st->time_base.num / st->time_base.den;
-            ret = hls_append_segment(s, hls, vs, cur_duration, vs->start_pos,  pkt->pts, event, vs->size);
+            ret = hls_append_segment(s, hls, vs, cur_duration, vs->start_pos, vs->size, event);
             vs->end_pts = pkt->pts;
             vs->duration = 0;
             if (ret < 0) {
@@ -2890,7 +2890,7 @@ failed:
         }
 
         /* after av_write_trailer, then duration + 1 duration per packet */
-        hls_append_segment(s, hls, vs, vs->duration + vs->dpp, vs->start_pos, vs->end_pts, NULL, vs->size);
+        hls_append_segment(s, hls, vs, vs->duration + vs->dpp, vs->start_pos, vs->size, NULL);
 
         sls_flag_file_rename(hls, vs, old_filename);
 
