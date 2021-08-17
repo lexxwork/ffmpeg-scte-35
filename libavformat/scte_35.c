@@ -102,32 +102,32 @@ static void ref_scte35_event(struct scte35_event *event)
     event->ref_count++;
 }
 
-static void unref_scte35_event(struct scte35_event **event)
-{
-    if (!(*event))
-        return;
-    if (!(*event)->ref_count) {
-        av_freep(&(*event)->pkt_base64);
-        //TOD fix segfault
-        // av_freep(event);
-    } else {
-        (*event)->ref_count--;
-    }
-}
+// static void unref_scte35_event(struct scte35_event **event)
+// {
+//     if (!(*event))
+//         return;
+//     if (!(*event)->ref_count) {
+//         av_freep(&(*event)->pkt_base64);
+//         //TOD fix segfault
+//         // av_freep(event);
+//     } else {
+//         (*event)->ref_count--;
+//     }
+// }
 
-static void unlink_scte35_event(struct scte35_interface *iface, struct scte35_event *event)
-{
-    if (!event)
-        return;
-    if (event->prev) {
-        event->prev->next = event->next;
-        if (event->next)
-            event->next->prev = event->prev;
-    }
-    else
-        iface->event_list = event->next;
-    unref_scte35_event(&event);
-}
+// static void unlink_scte35_event(struct scte35_interface *iface, struct scte35_event *event)
+// {
+//     if (!event)
+//         return;
+//     if (event->prev) {
+//         event->prev->next = event->next;
+//         if (event->next)
+//             event->next->prev = event->prev;
+//     }
+//     else
+//         iface->event_list = event->next;
+//     unref_scte35_event(&event);
+// }
 
 static void unref_scte35_block(struct scte35_interface *iface, struct scte35_event *event)
 {
