@@ -55,7 +55,7 @@ static char* get_hls_string(struct scte35_interface *iface, struct scte35_event 
         } else
             av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT\n");
     } else if (out_state == EVENT_OUT_CONT || out_state == EVENT_IN) {
-        if(out_state == EVENT_IN)
+        if(out_state == EVENT_IN && event->prev)
             event = event->prev;
         if (event && event->duration != AV_NOPTS_VALUE) {
             double duration = ((double)event->duration * iface->timebase.num) / iface->timebase.den;
