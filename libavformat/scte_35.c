@@ -438,7 +438,7 @@ static struct scte35_event* get_event_ciel_out(struct scte35_interface *iface, u
 {
     struct scte35_event *event = iface->event_list;
     while(event) {
-        if (!event->running && event->out_pts <= pts) {
+        if (!event->running) { //set event state immediately (removed && event->out_pts <= pts)
             iface->event_state = EVENT_OUT;
             break;
         }
