@@ -167,6 +167,7 @@ static struct scte35_event* get_event_id(struct scte35_interface *iface, int id)
         if (pevent) {
             pevent->next = event;
             event->prev = pevent;
+            event->running = pevent->running;
         }
         else
             iface->event_list = event;
@@ -438,7 +439,7 @@ static struct scte35_event* get_event_ciel_out(struct scte35_interface *iface, u
 {
     struct scte35_event *event = iface->event_list;
     while(event) {
-        if (!event->running && event->out_pts <= pts && event->in_pts == AV_NOPTS_VALUE) {
+        if (!event->running && event->out_pts <= pts && event->out_pts != AV_NOPTS_VALUE) {
             iface->event_state = EVENT_OUT;
             break;
         }
@@ -463,7 +464,7 @@ static struct scte35_event* get_event_floor_in(struct scte35_interface *iface, u
           (event->nearest_in_pts == AV_NOPTS_VALUE || pts <= event->nearest_in_pts) ) {
             event->nearest_in_pts = pts;
             /* send in_event only when that event was in running state */
-            if (iface->current_event->running) {
+            if (event->running) { //iface->current_event->running
                 iface->event_state = EVENT_IN;
                 sevent = event;
             }
