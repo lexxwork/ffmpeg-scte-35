@@ -23,8 +23,6 @@
 
 #include "libavutil/bprint.h"
 
-//#define AV_NOPTS_VALUE_U (uint64_t)AV_NOPTS_VALUE
-
 struct scte35_event {
     /* ID given for each separate event */
     int32_t id;
