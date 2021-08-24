@@ -49,7 +49,7 @@ static char* get_hls_string(struct scte35_interface *iface, struct scte35_event 
     av_bprint_clear(&iface->avbstr);
     if (out_state == EVENT_POSTOUT) {
         av_bprintf(&iface->avbstr, "#EXT-OATCLS-SCTE35:%s\n", event->pkt_base64);
-        if (event->duration != AV_NOPTS_VALUE) {
+        if (event->duration > 0) {
             double duration = ((double)event->duration * iface->timebase.num) / iface->timebase.den;
             av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT:%.3g\n", duration);
         } else
@@ -57,7 +57,7 @@ static char* get_hls_string(struct scte35_interface *iface, struct scte35_event 
     } else if (out_state == EVENT_OUT_CONT || out_state == EVENT_IN) {
         if(out_state == EVENT_IN && event->prev)
             event = event->prev;
-        if (event && event->duration != AV_NOPTS_VALUE) {
+        if (event && event->duration > 0) {
             double duration = ((double)event->duration * iface->timebase.num) / iface->timebase.den;
             double elapsed_time = (double)(pos - event->out_pts) * iface->timebase.num / iface->timebase.den;
             av_bprintf(&iface->avbstr, "#EXT-X-CUE-OUT-CONT:ElapsedTime=%.3f,Duration=%.3g,SCTE35=%s\n",
@@ -91,7 +91,7 @@ static struct scte35_event* alloc_scte35_event(int id)
     event->out_pts = AV_NOPTS_VALUE;
     event->running = 0;
     event->ref_count = 0;
-    event->duration = AV_NOPTS_VALUE;
+    event->duration = 0;
     event->next = NULL;
     event->prev = NULL;
     return event;
@@ -438,7 +438,7 @@ static struct scte35_event* get_event_ciel_out(struct scte35_interface *iface, u
 {
     struct scte35_event *event = iface->event_list;
     while(event) {
-        if (!event->running && event->out_pts <= pts) {
+        if (!event->running && event->out_pts <= pts && event->in_pts == AV_NOPTS_VALUE) {
             iface->event_state = EVENT_OUT;
             break;
         }
