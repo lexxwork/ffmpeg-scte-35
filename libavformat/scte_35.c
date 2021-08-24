@@ -464,8 +464,9 @@ static struct scte35_event* get_event_floor_in(struct scte35_interface *iface, u
           (event->nearest_in_pts == AV_NOPTS_VALUE || pts <= event->nearest_in_pts) ) {
             event->nearest_in_pts = pts;
             /* send in_event only when that event was in running state */
-            if (event->running) { //iface->current_event->running
+            if (event->running) {
                 iface->event_state = EVENT_IN;
+                event->running = 0;
                 sevent = event;
             }
         }
