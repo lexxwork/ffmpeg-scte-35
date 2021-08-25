@@ -2543,14 +2543,14 @@ static int hls_write_packet(AVFormatContext *s, AVPacket *pkt)
     if (hls->scte_iface)
         hls->scte_iface->update_video_pts(hls->scte_iface, pkt->pts);
 
-    can_split = can_split && (pkt->pts - vs->end_pts > 0);
     can_split_scte35  = hls->scte_iface &&
         hls->scte_iface->event_state != EVENT_NONE && 
         hls->scte_iface->event_state != EVENT_OUT_CONT;
+    
+    can_split = (can_split || can_split_scte35) && (pkt->pts - vs->end_pts > 0);
 
     if (vs->packets_written && can_split && 
-        ((av_compare_ts(pkt->pts - vs->start_pts, st->time_base, end_pts, AV_TIME_BASE_Q) >= 0) ||
-        can_split_scte35)) {
+        (av_compare_ts(pkt->pts - vs->start_pts, st->time_base, end_pts, AV_TIME_BASE_Q) >= 0)) {
         int64_t new_start_pos;
         int byterange_mode = (hls->flags & HLS_SINGLE_FILE) || (hls->max_seg_size > 0);
 
