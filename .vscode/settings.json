@@ -6,6 +6,10 @@
     "thread": "c",
     "numeric": "c",
     "avio_internal.h": "c",
-    "sstream": "c"
+    "sstream": "c",
+    "*.tcc": "c",
+    "fstream": "c",
+    "istream": "c",
+    "ostream": "c"
   }
 }
