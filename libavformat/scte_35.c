@@ -439,7 +439,9 @@ static struct scte35_event* get_event_ciel_out(struct scte35_interface *iface, u
 {
     struct scte35_event *event = iface->event_list;
     while(event) {
-        if (!event->running && event->out_pts <= pts && event->out_pts != AV_NOPTS_VALUE) {
+        if (!event->running && event->out_pts <= pts &&
+            event->out_pts != AV_NOPTS_VALUE &&
+            event->in_pts == AV_NOPTS_VALUE) {
             iface->event_state = EVENT_OUT;
             break;
         }
