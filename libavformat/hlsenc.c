@@ -2514,9 +2514,16 @@ static int hls_write_packet(AVFormatContext *s, AVPacket *pkt)
         vs->start_pts_from_audio = 0;
     }
 
+    if (hls->scte_iface)
+        hls->scte_iface->update_video_pts(hls->scte_iface, pkt->pts);
+        
+    can_split_scte35  = hls->scte_iface &&
+        hls->scte_iface->event_state == EVENT_OUT || 
+        hls->scte_iface->event_state == EVENT_IN;
+
     if (vs->has_video) {
         can_split = st->codecpar->codec_type == AVMEDIA_TYPE_VIDEO &&
-                    ((pkt->flags & AV_PKT_FLAG_KEY) || (hls->flags & HLS_SPLIT_BY_TIME));
+                    ((pkt->flags & AV_PKT_FLAG_KEY) || (hls->flags & HLS_SPLIT_BY_TIME) || can_split_scte35);
         is_ref_pkt = (st->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) && (pkt->stream_index == vs->reference_stream_index);
     }
     if (pkt->pts == AV_NOPTS_VALUE)
@@ -2539,13 +2546,6 @@ static int hls_write_packet(AVFormatContext *s, AVPacket *pkt)
             }
         }
     }
-
-    if (hls->scte_iface)
-        hls->scte_iface->update_video_pts(hls->scte_iface, pkt->pts);
-        
-    can_split_scte35  = hls->scte_iface &&
-        hls->scte_iface->event_state != EVENT_NONE && 
-        hls->scte_iface->event_state != EVENT_OUT_CONT;
 
     can_split = can_split && (pkt->pts - vs->end_pts > 0);
 
