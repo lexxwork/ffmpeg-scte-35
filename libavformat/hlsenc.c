@@ -2518,7 +2518,8 @@ static int hls_write_packet(AVFormatContext *s, AVPacket *pkt)
         hls->scte_iface->update_video_pts(hls->scte_iface, pkt->pts);
         
     can_split_scte35  = hls->scte_iface &&
-        hls->scte_iface->event_state == EVENT_OUT || 
+        hls->scte_iface->event_state == EVENT_OUT ||
+        hls->scte_iface->event_state == EVENT_POSTOUT || 
         hls->scte_iface->event_state == EVENT_IN;
 
     if (vs->has_video) {
