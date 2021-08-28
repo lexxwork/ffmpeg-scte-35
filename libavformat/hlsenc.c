@@ -2514,13 +2514,10 @@ static int hls_write_packet(AVFormatContext *s, AVPacket *pkt)
         vs->start_pts_from_audio = 0;
     }
 
-    if (hls->scte_iface)
+    if (hls->scte_iface) {
         hls->scte_iface->update_video_pts(hls->scte_iface, pkt->pts);
-        
-    can_split_scte35  = hls->scte_iface &&
-        hls->scte_iface->event_state == EVENT_OUT ||
-        hls->scte_iface->event_state == EVENT_POSTOUT || 
-        hls->scte_iface->event_state == EVENT_IN;
+        can_split_scte35 = hls->scte_iface && hls->scte_iface->event_state != EVENT_NONE;
+    }
 
     if (vs->has_video) {
         can_split = st->codecpar->codec_type == AVMEDIA_TYPE_VIDEO &&
@@ -2550,6 +2547,16 @@ static int hls_write_packet(AVFormatContext *s, AVPacket *pkt)
 
     can_split = can_split && (pkt->pts - vs->end_pts > 0);
 
+    if (can_split && can_split_scte35 && 
+        av_compare_ts(pkt->pts - vs->start_pts, st->time_base, end_pts, AV_TIME_BASE_Q) < 0) {
+        if (hls->scte_iface->event_state == hls->scte_iface->prev_event_state)
+            can_split_scte35 = 0;
+        if (hls->scte_iface->event_state != EVENT_OUT && hls->scte_iface->event_state != EVENT_IN)
+            hls->scte_iface->update_event_state(hls->scte_iface);
+        else if (can_split_scte35)
+            vs->number--;
+    }
+
     if (vs->packets_written && can_split && (can_split_scte35 ||
         av_compare_ts(pkt->pts - vs->start_pts, st->time_base, end_pts, AV_TIME_BASE_Q) >= 0)) {
         int64_t new_start_pos;
@@ -2558,9 +2565,11 @@ static int hls_write_packet(AVFormatContext *s, AVPacket *pkt)
         av_write_frame(oc, NULL); /* Flush any buffered data */
         new_start_pos = avio_tell(oc->pb);
         vs->size = new_start_pos - vs->start_pos;
+
         if (hls->scte_iface) {
             event = hls->scte_iface->update_event_state(hls->scte_iface);
         }
+
         avio_flush(oc->pb);
         if (hls->segment_type == SEGMENT_TYPE_FMP4) {
             if (!vs->init_range_length) {
