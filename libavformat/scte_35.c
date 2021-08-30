@@ -522,8 +522,6 @@ static struct scte35_event* update_event_state(struct scte35_interface *iface)
     
     iface->prev_event_state = iface->event_state;
     
-    if (event)
-       iface->ref_scte35_event(event);
     return event;
 }
 

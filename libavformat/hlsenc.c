@@ -2568,6 +2568,8 @@ static int hls_write_packet(AVFormatContext *s, AVPacket *pkt)
 
         if (hls->scte_iface) {
             event = hls->scte_iface->update_event_state(hls->scte_iface);
+            if (event)
+                hls->scte_iface->ref_scte35_event(event);
         }
 
         avio_flush(oc->pb);
