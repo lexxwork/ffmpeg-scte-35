@@ -2551,8 +2551,11 @@ static int hls_write_packet(AVFormatContext *s, AVPacket *pkt)
         av_compare_ts(pkt->pts - vs->start_pts, st->time_base, end_pts, AV_TIME_BASE_Q) < 0) {
         if (hls->scte_iface->event_state == hls->scte_iface->prev_event_state)
             can_split_scte35 = 0;
-        if (hls->scte_iface->event_state != EVENT_OUT && hls->scte_iface->event_state != EVENT_IN)
+        if (hls->scte_iface->event_state != EVENT_OUT && hls->scte_iface->event_state != EVENT_IN) {
             hls->scte_iface->update_event_state(hls->scte_iface);
+            if(hls->scte_iface->event_state == EVENT_NONE)
+                vs->number--;
+        }
         else if (can_split_scte35)
             vs->number--;
     }
