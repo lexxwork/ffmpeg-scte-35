@@ -2573,8 +2573,11 @@ static int hls_write_packet(AVFormatContext *s, AVPacket *pkt)
             event = hls->scte_iface->update_event_state(hls->scte_iface);
             if (event)
                 hls->scte_iface->ref_scte35_event(event);
+            if(event)
+                av_log(hls, AV_LOG_WARNING, 
+                    "SCTE-35: end_pts: %lu, out-pts: %lu\n", vs->end_pts, 
+                    event->out_pts != AV_NOPTS_VALUE ? event->out_pts : event->in_pts);
         }
-
         avio_flush(oc->pb);
         if (hls->segment_type == SEGMENT_TYPE_FMP4) {
             if (!vs->init_range_length) {
