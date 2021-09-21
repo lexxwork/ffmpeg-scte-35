@@ -1,3 +1,8 @@
+<h3>This is a mirror of original FFmpeg repository with the scte-35 implementation.
+<br>The main purpose to slice the stream to HLS format with decoded scte-35 information.
+<br>This task was not was not paid by user <strong>dmitry-seven</strong>, so shame on him and let it be public.
+<br>It still has some small bug, it may be fixed by your own. Please don't pull any request with any issue you find. Do it private.</h3>
+
 FFmpeg README
 =============
 
